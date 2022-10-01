@@ -36,6 +36,7 @@ cursos:
 servidores:
   - nombre: "Servidor 1"
     ip: 10.0.0.3
+    mac: fa:16:3e:02:79:e5
     servicios: 
       - nombre: ssh
         protocolo: TCP

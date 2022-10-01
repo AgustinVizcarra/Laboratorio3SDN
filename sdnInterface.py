@@ -1,4 +1,3 @@
-from xml.dom.minidom import NamedNodeMap
 import yaml
 import requests
 info = []
@@ -24,9 +23,10 @@ class Curso:
     def removerServidor(self,servidor):
         self.servidores.remove(servidor)
 class Servidor:
-    def __init__(self,nombre,IP):
+    def __init__(self,nombre,IP,MAC):
         self.nombre = nombre
         self.IP = IP
+        self.MAC = MAC
         self.servicios = []
     def agregarServicio(self,servicio):
         self.servicios.append(servicio)
@@ -72,7 +72,7 @@ def importData(name):
                 for alumno in alumnos:
                     listaAlumnos.append(Alumno(alumno["nombre"],alumno["mac"]))
                 for servidor in servidores:
-                    aux = Servidor(servidor["nombre"],servidor["ip"])
+                    aux = Servidor(servidor["nombre"],servidor["ip"],servidor["mac"])
                     for servicio in servidor ["servicios"]:
                         auxServ = Servicio(servicio["nombre"],servicio["protocolo"],servicio["puerto"])
                         listaServicios.append(auxServ)
@@ -102,6 +102,7 @@ def cursosModulo():
         print("4) Salir")
         opcion = input("Ingrese su opción: ")
         listaCursos = info[1]
+        listaServidores = info[2]
         match opcion:
             case "1":
                 for curso in listaCursos:
@@ -109,10 +110,18 @@ def cursosModulo():
                     print("EStado: "+curso.estado)
                     print("Lista de Alumnos: ")
                     for alumno in curso.alumnos:
-                        print("- "+alumno)
+                        print("- "+str(alumno))
                     print("Lista de Servidores: ")
+                    j=0
                     for servidor in curso.servidores:
                         print("- "+servidor)
+                        print("Lista de servicios")
+                        if(servidor == listaServidores[j].nombre):
+                            for servicio in listaServidores[j].servicios:
+                                print(".servicio: "+servicio.nombre)
+                                print(".protocolo: "+servicio.protocolo)
+                                print(".puerto: "+str(servicio.puerto))
+                        j+=1
             case "2":
                 nombreCurso  = input("Ingrese el nombre del curso o su codigo: ")
                 encontrado = False
@@ -131,32 +140,40 @@ def cursosModulo():
                 if(encontrado):
                     print("No se ha encontrado resultados")
             case "3":
-                while(True):
-                    print("Seleccione una opcion: ")
-                    print("1) Agregar")
-                    print("2) Eliminar")
-                    print("3) Salir")
-                    opcion_Actualizar = input("Ingrese su opción: ")
-                    curso_Nombre = input("Ingrese el nombre del curso o su codigo: ")
-                    for curso in listaCursos:
-                        if(curso_Nombre == curso.nombre or curso_Nombre == curso.codigo):
-                            match opcion_Actualizar:
-                                case "1":
-                                    CodigoAgregar = input("Digite el codigo del alumno que desea agregar")
-                                    listaCursos.alumnos.append(CodigoAgregar)
-                                case "2":
-                                    CodigoEliminar = input("Digite el codigo del alumno que desea eliminar")
-                                    try:
-                                        listaCursos.alumnos.remove(CodigoEliminar)
-                                    except:
-                                        print("No se ha encontrado al alumno con codigo "+str(CodigoEliminar)+" dentro del curso "+curso.nombre)
-                                case "3":
-                                    break
-                                case _:
-                                    print("Ha ingresado una opcion invalida!")
-                            info[1] = listaCursos
-                        else:
-                            print("No se ha encontrado ese curso en la lista de Cursos!")
+                print("Seleccione una opcion: ")
+                print("1) Agregar")
+                print("2) Eliminar")
+                print("3) Salir")
+                opcion_Actualizar = input("Ingrese su opción: ")
+                curso_Nombre = input("Ingrese el nombre del curso o su codigo: ")
+                match = False
+                index = 0
+                for curso in listaCursos:
+                    if(curso_Nombre == curso.nombre or curso_Nombre == curso.codigo):
+                        match = True    
+                        cursoEditar = curso
+                        break                        
+                    else:
+                        print("No se ha encontrado ese curso en la lista de Cursos!")
+                    index += 1
+                match opcion_Actualizar:
+                    case "1":
+                        if(match):
+                            CodigoAgregar = input("Digite el codigo del alumno que desea agregar: ")
+                            cursoEditar.alumnos.append(CodigoAgregar)
+                            info[2][index] = cursoEditar
+                    case "2":
+                        if(match):
+                            CodigoEliminar = input("Digite el codigo del alumno que desea eliminar: ")
+                            try:
+                                cursoEditar.alumnos.remove(CodigoEliminar)
+                                info[2][index] = cursoEditar
+                            except:
+                                print("No se ha encontrado al alumno con codigo "+str(CodigoEliminar)+" dentro del curso "+curso.nombre)
+                    case "3":
+                        break
+                    case _:
+                        print("Ha ingresado una opcion invalida!")
             case "4":
                 break
             case _:
@@ -289,7 +306,7 @@ def crearConexion(servidor,usuario,curso,servicio):
     if(estaMatriculado and estaActivo and servidorCurso and servicioServidor):
         #Realiza la conexion
         #Primera Pregunta -> ¿Que es un handler?
-        handler = "Algo"
+        handler = usuario.codigo+"_"+servicio.nombre+"_"+servidor.ip
         conexion = Conexion(handler,usuario.codigo,servidor.IP,servicio.nombre)
         ####
         #Se realiza la conexión por medio de Flow Entries
