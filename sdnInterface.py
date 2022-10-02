@@ -391,10 +391,10 @@ def conexionesModulo():
                 break
             case _:
                 print("Ha ingresado una opción invalida")
-print("######################################")
+                print("######################################")
+##Menu Principal:                
 print("Network Policy Manager del UPSM")
 print("######################################")
-
 while(True):
     print("-- Menu Principal --")
     print("Seleccione una opcion: ")
