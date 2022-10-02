@@ -4,8 +4,9 @@ info = []
 conexiones = []
 ##Informe Previo-Clases
 class Alumno:
-    def __init__(self,nombre,PC):
+    def __init__(self,nombre,codigo,PC):
         self.nombre = nombre
+        self.codigo = codigo
         self.PC = PC
 class Curso:
     def __init__(self,nombre,estado,codigo):
@@ -38,7 +39,7 @@ class Servicio:
         self.protocolo = protocolo
         self.puerto = puerto
 class Conexion:
-    def _init_(self,handler,usuario,servidor,servicio):
+    def __init__(self,handler,usuario,servidor,servicio):
         self.handler = handler
         self.usuario = usuario
         self.servidor = servidor
@@ -70,7 +71,7 @@ def importData(name):
                         aux.agregarServidor(servidor["nombre"])
                     listaCursos.append(aux)
                 for alumno in alumnos:
-                    listaAlumnos.append(Alumno(alumno["nombre"],alumno["mac"]))
+                    listaAlumnos.append(Alumno(alumno["nombre"],alumno["codigo"],alumno["mac"]))
                 for servidor in servidores:
                     aux = Servidor(servidor["nombre"],servidor["ip"],servidor["mac"])
                     for servicio in servidor ["servicios"]:
@@ -160,14 +161,14 @@ def cursosModulo():
                     case "1":
                         if(match):
                             CodigoAgregar = input("Digite el codigo del alumno que desea agregar: ")
-                            cursoEditar.alumnos.append(CodigoAgregar)
-                            info[2][index] = cursoEditar
+                            cursoEditar.alumnos.append(int(CodigoAgregar))
+                            info[1][index] = cursoEditar
                     case "2":
                         if(match):
                             CodigoEliminar = input("Digite el codigo del alumno que desea eliminar: ")
                             try:
-                                cursoEditar.alumnos.remove(CodigoEliminar)
-                                info[2][index] = cursoEditar
+                                cursoEditar.alumnos.remove(int(CodigoEliminar))
+                                info[1][index] = cursoEditar
                             except:
                                 print("No se ha encontrado al alumno con codigo "+str(CodigoEliminar)+" dentro del curso "+curso.nombre)
                     case "3":
@@ -259,17 +260,23 @@ def get_attachment_points(mac):
     outputPort = relevantInfo["port"]
     return[switchDPID, outputPort]
 def getRoute(DPID_src,port_source,DPID_dest,port_dest):
+    listHops = []
     api = "http://10.20.12.64:8080/wm/topology/route/"
     api = api + "/" + DPID_src + "/" + str(port_source) + "/" + DPID_dest + "/" + str(port_dest) + "/json"
     response = requests.get(api)
     data = response.json()
-    print("Ruta del Switch con DPID: "+DPID_src+" hacia el Switch con DPID: "+DPID_dest)
-    print("----------------------------------------------------------------")
-    counter = 0
+    #print("Ruta del Switch con DPID: "+DPID_src+" hacia el Switch con DPID: "+DPID_dest)
+    #print("----------------------------------------------------------------")
+    #counter = 0
     for hop in data:
-        print(str(counter+1)+". DPID: "+hop["switch"]+" por el puerto: "+str(hop["port"]["portNumber"]))
-        counter += 1
-    print("----------------------------------------------------------------") 
+        #print(str(counter+1)+". DPID: "+hop["switch"]+" por el puerto: "+str(hop["port"]["portNumber"]))
+        #counter += 1
+        listHops.append([hop["switch"],hop["port"]["portNumber"]])
+    #print("----------------------------------------------------------------") 
+    #Luego se crean los flows entries tanto para ARP como para los servicios
+    listFlowEntries = []
+    ###
+    return listHops
 def addlow(flow):
     api = "http://10.20.11.64:8080/wm/staticflowpusher/json"
     response = requests.post(api, json=flow)
@@ -305,21 +312,22 @@ def crearConexion(servidor,usuario,curso,servicio):
     #Si en caso se tienen todas las validaciones
     if(estaMatriculado and estaActivo and servidorCurso and servicioServidor):
         #Realiza la conexion
-        #Primera Pregunta -> ¿Que es un handler?
-        handler = usuario.codigo+"_"+servicio.nombre+"_"+servidor.ip
+        handler = str(usuario.codigo)+"_"+servicio.nombre+"_"+servidor.IP
         conexion = Conexion(handler,usuario.codigo,servidor.IP,servicio.nombre)
         ####
-        #Se realiza la conexión por medio de Flow Entries
-        # Segunda pregunta -> Permite la conexión SSH entre dos Hosts pese a que el modulo de forwarding se encuentra activado
-        # Tercera pregunta -> ¿A qué hace referencia los flow Entries de ARP?
-        # Cuarta pregunta -> Como hago para construir las rutas entre el host con IP correspondiente al servidor 
-        # si es que el unico input por parte del server es su IP pero el get Attachment solo recibe mac :v
+        macUsuario = usuario.PC
+        macServidor = servidor.MAC
+        #Gestiono los attachmentPoint
+        infoSWUsuario = get_attachment_points(macUsuario)
+        infoSWServidor = get_attachment_points(macServidor)
+        #Obtengo la ruta
+        rutaUsuarioServidor = getRoute(infoSWUsuario[0],infoSWUsuario[1],infoSWServidor[0],infoSWServidor[1]) 
+        print(rutaUsuarioServidor)       
         ####        
         return conexion
     else:
         print("Hay campos que no coinciden o que son inválidos")
-        return "No Match"
-        
+        return "No Match"      
 def conexionesModulo():
     global info
     global conexiones
@@ -350,10 +358,10 @@ def conexionesModulo():
                 servicioEncontrado = "Algo"
                 servidorEncontrado = "Algo"
                 for alumno in alumnos:
-                    if(alumno.nombre == alumnoDato or alumno.codigo == alumnoDato):
-                        alumnoEncontrado = alumno
+                    if(alumno.nombre == alumnoDato or str(alumno.codigo) == alumnoDato):
+                        alumnoEncontrado = alumno                        
                         break
-                for curso in curso:
+                for curso in cursos:
                     if(curso.nombre == cursoDato or curso.codigo == cursoDato):
                         cursoEncontrado = curso
                         break
@@ -371,8 +379,10 @@ def conexionesModulo():
                     #Si se ha encontrado toda la data en el sistema se procede a crear la conexion
                     response = crearConexion(servidorEncontrado,alumnoEncontrado,cursoEncontrado,servicioEncontrado)
                     if(response != "No Match" ):
-                        conexiones.append(response)
+                        #conexiones.append(response)
                         print("Conexión creada exitosamente!")
+                    else:
+                        print("Los campos ingresados son inválidos")
             case "2":
                 pass
             case "3":
