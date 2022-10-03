@@ -263,7 +263,6 @@ def addflow(flow):
     api = "http://10.20.12.64:8080/wm/staticflowpusher/json"
     response = requests.post(api, json=flow)
     if(response.status_code == 200):
-        #print("Flow entry añadida correctamente")
         pass
     else:
         print("Ha ocurrido un error en la flow entry añadida")     
@@ -271,7 +270,6 @@ def delflow(flow):
     api = "http://10.20.12.64:8080/wm/staticflowpusher/json"
     response = requests.delete(api, json=flow)
     if(response.status_code == 200):
-        #print("Flow entry eliminada correctamente")
         pass
     else:
         print("Ha ocurrido un error en la flow entry eliminada")
@@ -281,14 +279,10 @@ def getRoute(DPID_src,port_source,DPID_dest,port_dest,servicio,usuario,servidor)
     api = api + "/" + DPID_src + "/" + str(port_source) + "/" + DPID_dest + "/" + str(port_dest) + "/json"
     response = requests.get(api)
     data = response.json()
-    #print("Ruta del Switch con DPID: "+DPID_src+" hacia el Switch con DPID: "+DPID_dest)
-    #print("----------------------------------------------------------------")
     counter = 0
     for hop in data:
-        #print(str(counter+1)+". DPID: "+hop["switch"]+" por el puerto: "+str(hop["port"]["portNumber"]))
         counter += 1
         listHops.append([hop["switch"],hop["port"]["portNumber"]])
-    #print("----------------------------------------------------------------") 
     #Luego se crean los flows entries tanto para ARP como para los servicios
     listFlowEntries = []
     for counter in range(len(listHops)):
@@ -374,7 +368,6 @@ def crearConexion(servidor,usuario,curso,servicio):
         #Realiza la conexion
         handler = str(usuario.codigo)+"_"+servicio.nombre+"_"+servidor.IP
         conexion = Conexion(handler,usuario.codigo,servidor.IP,servicio.nombre)
-        ####
         macUsuario = usuario.PC
         macServidor = servidor.MAC
         #Gestiono los attachmentPoint
