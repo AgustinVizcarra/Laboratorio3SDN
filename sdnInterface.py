@@ -46,9 +46,9 @@ class Conexion:
         self.servicio = servicio
         self.flowEntries = []
     def agregarFlowEntry(self,flowEntry):
-        self.servicios.append(flowEntry)
+        self.flowEntries.append(flowEntry)
     def removerFlowEntry(self,flowEntry):
-        self.servicios.remove(flowEntry)
+        self.flowEntries.remove(flowEntry)
 ##Funciones
 def importData(name):
     global info
@@ -260,17 +260,19 @@ def get_attachment_points(mac):
     outputPort = relevantInfo["port"]
     return[switchDPID, outputPort]
 def addflow(flow):
-    api = "http://10.20.11.64:8080/wm/staticflowpusher/json"
+    api = "http://10.20.12.64:8080/wm/staticflowpusher/json"
     response = requests.post(api, json=flow)
     if(response.status_code == 200):
-        print("Flow entry añadida correctamente")
+        #print("Flow entry añadida correctamente")
+        pass
     else:
         print("Ha ocurrido un error en la flow entry añadida")     
 def delflow(flow):
-    api = "http://10.20.11.64:8080/wm/staticflowpusher/json"
-    response = requests.post(api, json=flow)
+    api = "http://10.20.12.64:8080/wm/staticflowpusher/json"
+    response = requests.delete(api, json=flow)
     if(response.status_code == 200):
-        print("Flow entry eliminada correctamente")
+        #print("Flow entry eliminada correctamente")
+        pass
     else:
         print("Ha ocurrido un error en la flow entry eliminada")
 def getRoute(DPID_src,port_source,DPID_dest,port_dest,servicio,usuario,servidor):
@@ -312,8 +314,6 @@ def getRoute(DPID_src,port_source,DPID_dest,port_dest,servicio,usuario,servidor)
                 "eth_type":"0x0806", #ARP
                 "arp_opcode":"1", #Request
                 "eth_src": usuario.PC,
-                "eth_dst": servidor.MAC,
-                "ipv4_dst": servidor.IP,
                 "active" : "true",
                 "actions" : "output="+str(listHops[counter+1][1])
             }
@@ -341,8 +341,6 @@ def getRoute(DPID_src,port_source,DPID_dest,port_dest,servicio,usuario,servidor)
                 "eth_type":"0x0806", #ARP
                 "arp_opcode":"2", #Reply
                 "eth_src": servidor.MAC,
-                "ipv4_src": servidor.IP,
-                "eth_dst": usuario.PC,
                 "active" : "true",
                 "actions" : "output="+str(listHops[counter-1][1])
             }
@@ -441,20 +439,41 @@ def conexionesModulo():
                     #Si se ha encontrado toda la data en el sistema se procede a crear la conexion
                     response = crearConexion(servidorEncontrado,alumnoEncontrado,cursoEncontrado,servicioEncontrado)
                     if(response != "No Match" ):
-                        #conexiones.append(response)
+                        conexiones.append(response)
                         print("Conexión creada exitosamente!")
                     else:
                         print("Los campos ingresados son inválidos")
             case "2":
-                pass
+                if(len(conexiones)!= 0):
+                    print("# |      Handler     |       Usuario     |      Servidor    |    Servicio   ")
+                    counter = 1
+                    for conexion in conexiones:
+                        print(str(counter)+"."+" |  "+conexion.handler+" | "+str(conexion.usuario)+" | "+conexion.servidor+" | "+conexion.servicio)
+                        counter += 1
+                else:
+                    print("No se tienen conexiones registradas en el sistema!")
             case "3":
-                pass
+                handler = input("Digite el Handler de la conexion que desea eliminar: ")
+                if(len(conexiones) != 0):
+                    for conexion in conexiones:
+                        if(conexion.handler == handler):
+                            listFlows = conexion.flowEntries
+                            for flow in listFlows:
+                                delflow(flow)
+                            #Una vez eliminada todos los flows Entries del controlador se borra la conexión de la lista de Conexiones
+                            conexiones.remove(conexion)
+                            print("Se ha eliminado la conexion correctamente! ")
+                            break
+                else:
+                    print("No hay conexiones registradas para poder eliminar")
             case "4":
                 break
             case _:
                 print("Ha ingresado una opción invalida")
                 print("######################################")
 ##Menu Principal:                
+print("Este proyecto es apto a partir de Python 3.10 en adelante")
+print("######################################")
 print("Network Policy Manager del UPSM")
 print("######################################")
 while(True):
@@ -490,3 +509,4 @@ while(True):
         case _:
             print("Ha ingresado una opcion incorrecta intente denuevo")
 print("Gracias por usar nuestro servicio!")
+print("AgustinVizcarra.Inc")
