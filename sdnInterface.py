@@ -259,25 +259,7 @@ def get_attachment_points(mac):
     switchDPID = relevantInfo["switchDPID"]
     outputPort = relevantInfo["port"]
     return[switchDPID, outputPort]
-def getRoute(DPID_src,port_source,DPID_dest,port_dest):
-    listHops = []
-    api = "http://10.20.12.64:8080/wm/topology/route/"
-    api = api + "/" + DPID_src + "/" + str(port_source) + "/" + DPID_dest + "/" + str(port_dest) + "/json"
-    response = requests.get(api)
-    data = response.json()
-    #print("Ruta del Switch con DPID: "+DPID_src+" hacia el Switch con DPID: "+DPID_dest)
-    #print("----------------------------------------------------------------")
-    #counter = 0
-    for hop in data:
-        #print(str(counter+1)+". DPID: "+hop["switch"]+" por el puerto: "+str(hop["port"]["portNumber"]))
-        #counter += 1
-        listHops.append([hop["switch"],hop["port"]["portNumber"]])
-    #print("----------------------------------------------------------------") 
-    #Luego se crean los flows entries tanto para ARP como para los servicios
-    listFlowEntries = []
-    ###
-    return listHops
-def addlow(flow):
+def addflow(flow):
     api = "http://10.20.11.64:8080/wm/staticflowpusher/json"
     response = requests.post(api, json=flow)
     if(response.status_code == 200):
@@ -291,6 +273,86 @@ def delflow(flow):
         print("Flow entry eliminada correctamente")
     else:
         print("Ha ocurrido un error en la flow entry eliminada")
+def getRoute(DPID_src,port_source,DPID_dest,port_dest,servicio,usuario,servidor):
+    listHops = []
+    api = "http://10.20.12.64:8080/wm/topology/route/"
+    api = api + "/" + DPID_src + "/" + str(port_source) + "/" + DPID_dest + "/" + str(port_dest) + "/json"
+    response = requests.get(api)
+    data = response.json()
+    #print("Ruta del Switch con DPID: "+DPID_src+" hacia el Switch con DPID: "+DPID_dest)
+    #print("----------------------------------------------------------------")
+    counter = 0
+    for hop in data:
+        #print(str(counter+1)+". DPID: "+hop["switch"]+" por el puerto: "+str(hop["port"]["portNumber"]))
+        counter += 1
+        listHops.append([hop["switch"],hop["port"]["portNumber"]])
+    #print("----------------------------------------------------------------") 
+    #Luego se crean los flows entries tanto para ARP como para los servicios
+    listFlowEntries = []
+    for counter in range(len(listHops)):
+        if counter % 2 == 0 :
+            #Estoy en la ida
+            flowDirect = {
+                "name" : "flowDirect"+str(counter)+": "+servicio.nombre+usuario.PC+"->"+servidor.MAC,
+                "switch":listHops[counter][0],
+                "cookie":"0",
+                "eth_type":"0x0800",
+                "ip_proto":"6",
+                "eth_src": usuario.PC,
+                "eth_dst": servidor.MAC,
+                "ipv4_dst": servidor.IP,
+                "tp_dst": servicio.puerto,
+                "active": "true",
+                "actions" : "output="+str(listHops[counter+1][1]) #Mapeo el puerto siguiente
+            }
+            flowDirectARP={
+                "name" : "flowDirectARP"+str(counter)+": "+servicio.nombre+usuario.PC+"->"+servidor.MAC,
+                "switch":listHops[counter][0],
+                "cookie":"0",
+                "eth_type":"0x0806", #ARP
+                "arp_opcode":"1", #Request
+                "eth_src": usuario.PC,
+                "eth_dst": servidor.MAC,
+                "ipv4_dst": servidor.IP,
+                "active" : "true",
+                "actions" : "output="+str(listHops[counter+1][1])
+            }
+            listFlowEntries.append(flowDirectARP)
+            listFlowEntries.append(flowDirect)
+        else:
+            #Estoy en la vuelta
+            flowBack = {
+                "name" : "flowBack"+str(counter)+": "+servicio.nombre+usuario.PC+"->"+servidor.MAC,
+                "switch":listHops[counter][0],
+                "cookie":"0",
+                "eth_type":"0x0800",
+                "ip_proto":"6",
+                "eth_src": servidor.MAC,
+                "ipv4_src": servidor.IP,
+                "tp_src": servicio.puerto,
+                "eth_dst": usuario.PC,
+                "active": "true",
+                "actions" : "output="+str(listHops[counter-1][1]) #Mapeo el puerto anterior
+            }
+            flowBackArp={
+                "name" : "flowBackARP"+str(counter)+": "+servicio.nombre+usuario.PC+"->"+servidor.MAC,
+                "switch":listHops[counter][0],
+                "cookie":"0",
+                "eth_type":"0x0806", #ARP
+                "arp_opcode":"2", #Reply
+                "eth_src": servidor.MAC,
+                "ipv4_src": servidor.IP,
+                "eth_dst": usuario.PC,
+                "active" : "true",
+                "actions" : "output="+str(listHops[counter-1][1])
+            }
+            listFlowEntries.append(flowBackArp)
+            listFlowEntries.append(flowBack)
+    #Una vez añadidos todos los flow entries se proceden a enviarlo
+    for flow in listFlowEntries:
+        addflow(flow)
+    #Se devuelven los flow entries
+    return listFlowEntries
 #Modulo de conexiones
 def crearConexion(servidor,usuario,curso,servicio):
     estaActivo = False
@@ -321,9 +383,9 @@ def crearConexion(servidor,usuario,curso,servicio):
         infoSWUsuario = get_attachment_points(macUsuario)
         infoSWServidor = get_attachment_points(macServidor)
         #Obtengo la ruta
-        rutaUsuarioServidor = getRoute(infoSWUsuario[0],infoSWUsuario[1],infoSWServidor[0],infoSWServidor[1]) 
-        print(rutaUsuarioServidor)       
-        ####        
+        flows = getRoute(infoSWUsuario[0],infoSWUsuario[1],infoSWServidor[0],infoSWServidor[1],servicio,usuario,servidor) 
+        for flow in flows:
+            conexion.agregarFlowEntry(flow)   
         return conexion
     else:
         print("Hay campos que no coinciden o que son inválidos")
